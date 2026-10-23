@@ -249,6 +249,7 @@ export function RemoteHostScreen({ theme, layout, host, navigation }: PluginScre
         <RemoteAgentDetail
           theme={theme}
           layout={layout}
+          host={host}
           serverId={serverId}
           agent={selectedAgent}
           agents={state.agents}

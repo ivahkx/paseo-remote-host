@@ -2,7 +2,7 @@
 // plugin server and supports user-supplied language files; this plugin has no server, so it simply binds the two
 // catalogs it ships with, chosen by the device's language. English is layered under Chinese so a gap reads as English
 // rather than as a raw message id.
-import { bindTranslator, createTranslator, normalizeLanguage } from "../shared/i18n";
+import { bindTranslator, catalogName, createTranslator, normalizeLanguage } from "../shared/i18n";
 import zh from "../shared/locales/zh-CN.json";
 import en from "../shared/locales/en.json";
 import kitZh from "../shared/locales/kit/zh-CN.json";
@@ -24,9 +24,14 @@ function deviceLanguage(): string {
   }
 }
 
+/** The bound catalog's own name for its language ("English", "简体中文"), for the instruction that asks a model for it. */
+let boundName = catalogName(en) ?? "English";
+export const pluginLanguageName = (): string => boundName;
+
 /** Binds the plugin's text to the device's language. Called once when the plugin is contributed. */
 export function bindPluginLanguage(): void {
   const chinese = deviceLanguage().toLowerCase().startsWith("zh");
+  boundName = (chinese ? catalogName(zh) : catalogName(en)) ?? boundName;
   bindTranslator(chinese
     ? createTranslator("zh-CN", [zh, kitZh, en, kitEn])
     : createTranslator("en", [en, kitEn]));

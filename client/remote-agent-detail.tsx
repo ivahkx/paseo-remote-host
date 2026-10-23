@@ -1,23 +1,23 @@
 // A remote host's agent detail, mirroring Observatory's own AgentDetail (client/agent-detail.tsx): the same six-tab shell
 // (Result · Recap · Timeline · Subtasks · Diagnostics · Analysis), driven entirely from the borrowed remote connection.
 // Result, Recap (the 复盘 digest) and Timeline all run the plugin's own builders client-side over that connection, and
-// Subtasks renders the managed tree from the remote directory snapshot. Diagnostics and Analysis depend on evidence only
-// the local plugin server records, so they show on-brand empty states. The AI recap card in the header is the one thing
+// Subtasks renders the managed tree from the remote directory snapshot. Diagnostics reads the same history evidence the
+// local server's RPC reads, minus the plugin observations only a host-local plugin records. Analysis reads that evidence
+// too, then asks a model on *this* host to review it (client/remote-insights.tsx): the observed host is never written to.
 // This plugin has no server side at all: everything here is read over the borrowed connection.
 import { t } from "../shared/text";
 import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { getPaseoClient } from "@getpaseo/plugin/client";
 import { useQuery } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useCallback, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { Icon, ScrollView, copyText, useToast } from "@getpaseo/plugin/client/react-native";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { formatTokens, type AgentRecord } from "../shared/model";
 import { fetchAgentResult } from "../shared/result-build";
-import { normalizeTimelinePage } from "../shared/timeline";
 import type { DigestTurn } from "../shared/digest";
 import type { TelemetrySnapshot } from "../shared/telemetry";
-import { Button, EmptyState, IconButton, MetaLine, Spacer, Tabs, Toolbar, fontSize, hairline, hue, radius, relativeTime, space } from "./kit";
+import { Button, IconButton, MetaLine, Spacer, Tabs, Toolbar, fontSize, hairline, hue, radius, relativeTime, space } from "./kit";
 import { IdentityLine, checkoutName, providerLine } from "./ui";
 import { PhaseLine, hueColor, tint } from "./status";
 import { Sweep } from "./motion";
@@ -27,6 +27,7 @@ import { useRemoteEvidence } from "./remote-evidence";
 import { useRemoteDigest } from "./remote-digest";
 import { ResultView } from "./result-view";
 import { SubtasksView } from "./subtasks-view";
+import { RemoteInsights } from "./remote-insights";
 import { TimelineContent } from "./timeline-view";
 import { useRemoteTimeline } from "./remote-timeline";
 
@@ -126,18 +127,11 @@ function UserPrompts({ theme, timeline, turns, pending, agentId, now, onOpen }: 
   );
 }
 
-function RemoteEmpty({ theme, icon, title, message, inset, header }: { theme: PluginTheme; icon: string; title: string; message: string; inset: number; header?: ReactNode }) {
-  return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: inset, paddingBottom: space.xxl }}>
-      {header}
-      <EmptyState theme={theme} icon={icon} title={title} message={message} tone="neutral" />
-    </ScrollView>
-  );
-}
-
-export function RemoteAgentDetail({ theme, layout, serverId, agent, agents, events, navigation, onBack, onSelectAgent }: {
+export function RemoteAgentDetail({ theme, layout, host, serverId, agent, agents, events, navigation, onBack, onSelectAgent }: {
   theme: PluginTheme;
   layout: PluginScreenProps["layout"];
+  /** The host this screen runs on. Only the Analysis tab uses it, to run its model somewhere other than the observed host. */
+  host: PluginScreenProps["host"];
   serverId: string;
   agent: AgentRecord;
   agents: AgentRecord[];
@@ -174,6 +168,9 @@ export function RemoteAgentDetail({ theme, layout, serverId, agent, agents, even
     retry: 1,
   });
   const openInApp = navigation?.openAgent ? () => void navigation.openAgent?.({ agentId: agent.id, serverId }) : undefined;
+  // Borrowed only when an analysis starts: getPaseoClient throws for a host that is no longer connected, and the
+  // Analysis tab reports that as a failed run rather than taking the screen down with it.
+  const openRemote = useCallback(() => getPaseoClient(serverId), [serverId]);
 
   const header = (
     <View style={{ gap: space.sm, paddingTop: compact ? space.lg : 0 }}>
@@ -229,8 +226,9 @@ export function RemoteAgentDetail({ theme, layout, serverId, agent, agents, even
       </View>
     </ScrollView>
   ) : (
-    <RemoteEmpty theme={theme} icon="Sparkles" title={t("coreRemoteHost.analysisTitle")}
-      message={t("coreRemoteHost.analysisMessage")} inset={inset} header={scrolled} />
+    // Read there, analysed here: the trajectory comes over the borrowed connection, the model runs on this host.
+    <RemoteInsights theme={theme} serverId={serverId} host={host} agent={agent} remote={openRemote}
+      inset={inset} header={scrolled} onOpenEvidence={openEvidence} />
   );
 
   const blue = hueColor(theme, "run");

@@ -1,7 +1,7 @@
 {
   "id": "remote-host",
   "name": "Remote Host",
-  "description": "Read-only view of the agents running on any host your app is connected to. It borrows that host's own connection, so it needs no endpoint, no credentials and nothing installed on the remote machine. Sessions, events, tokens, signals, and a per-session detail with result, recap, timeline, subtasks and diagnostics. English and Simplified Chinese.",
+  "description": "Read-only view of the agents running on any host your app is connected to. It borrows that host's own connection, so it needs no endpoint, no credentials and nothing installed on the remote machine. Sessions, events, tokens, signals, and a per-session detail with result, recap, timeline, subtasks, diagnostics and an AI analysis that reads the remote session but runs its model on your own host. English and Simplified Chinese.",
   "requirements": {
     "paseo": ">=0.11.1"
   }
