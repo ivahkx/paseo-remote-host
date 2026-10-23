@@ -441,6 +441,19 @@
     "timeNotRecorded": "时间未记录",
     "analyzedAt": "{value1}分析"
   },
+  "coreRemoteStats": {
+    "turnFails": "轮次失败",
+    "toolFails": "工具失败",
+    "approvals": "审批",
+    "compactions": "上下文压缩",
+    "runtime": "运行时长",
+    "rate": "{value1}%",
+    "withWait": "{value1} · {value2}",
+    "changeLines": "{value1} +{value2} −{value3}",
+    "ofChecks": "{value1}/{value2}",
+    "childTokens": "{value1} Token",
+    "statSpoken": "{label} {value1}"
+  },
   "secondaryResultView": {
     "openInBrowser": "在浏览器打开",
     "code": "代码",

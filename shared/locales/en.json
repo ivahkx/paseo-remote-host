@@ -496,6 +496,19 @@
     "timeNotRecorded": "Time not recorded",
     "analyzedAt": "Analyzed {value1}"
   },
+  "coreRemoteStats": {
+    "turnFails": "Turn fails",
+    "toolFails": "Tool fails",
+    "approvals": "Approvals",
+    "compactions": "Compactions",
+    "runtime": "Run time",
+    "rate": "{value1}%",
+    "withWait": "{value1} · {value2}",
+    "changeLines": "{value1} +{value2} −{value3}",
+    "ofChecks": "{value1}/{value2}",
+    "childTokens": "{value1} tokens",
+    "statSpoken": "{label} {value1}"
+  },
   "secondaryResultView": {
     "openInBrowser": "Open in browser",
     "code": "Code",

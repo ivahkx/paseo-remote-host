@@ -213,8 +213,28 @@ export function RemoteHostScreen({ theme, layout, host, navigation }: PluginScre
 
   const pad = layout.compact ? 12 : 20;
   const serverId = selectedHost?.serverId ?? null;
+  // The rows actually on screen, in the order they are drawn, so the bounded summary budget follows the reader: expand a
+  // thread and its subagents are summarised too, instead of the budget being spent on rows nobody has opened.
+  const visibleAgents = useMemo(() => items.flatMap((item) => (item.kind === "row" ? [item.row.node.agent] : [])), [items]);
   // A bounded per-row digest summary, read only while the Sessions list is the visible tab.
-  const rowStats = useRemoteListDigests(serverId, state.agents, tab === "sessions" && !selectedAgentId);
+  const rowStats = useRemoteListDigests(serverId, visibleAgents, tab === "sessions" && !selectedAgentId);
+  // What a collapsed thread cost, summed from the subagents' own reported usage. No history is folded for this: it comes
+  // from the directory snapshot the list already holds, so it is there before any summary has been read.
+  const childTokens = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const item of items) {
+      if (item.kind !== "row" || !item.row.node.children.length) continue;
+      let sum = 0;
+      const stack = [...item.row.node.children];
+      while (stack.length) {
+        const child = stack.pop()!;
+        sum += child.agent.usage.totalTokens ?? 0;
+        stack.push(...child.children);
+      }
+      if (sum) totals.set(item.row.node.agent.id, sum);
+    }
+    return totals;
+  }, [items]);
   const openAgent = (agentId: string) => {
     if (serverId) navigation?.openAgent?.({ agentId, serverId });
   };
@@ -275,6 +295,7 @@ export function RemoteHostScreen({ theme, layout, host, navigation }: PluginScre
               now={now}
               signals={signalLabels}
               stats={rowStats}
+              childTokens={childTokens}
               empty={
                 <Centered
                   theme={theme}

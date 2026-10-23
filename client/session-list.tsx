@@ -10,7 +10,9 @@ import { RecapLine } from "./recap";
 import type { DashboardGroup, DashboardRow } from "../shared/dashboard-model";
 import { reasonLine, type AttentionPhase, type ReasonLine } from "../shared/attention";
 import type { HeartbeatSummary } from "../shared/schedules";
-import { HueDot, MetaLine, aria, fontSize, hairline, hueFor, radius, relativeTime, space } from "./kit";
+import { HueDot, MetaLine, aria, compactNumber, fontSize, hairline, hueFor, radius, relativeTime, space } from "./kit";
+import { RowStatStrip } from "./row-stats";
+import { statsSentence, type RowStats } from "../shared/row-stats";
 import { providerLine, readLabel, shortDuration, stateName } from "./ui";
 import { Flash, Pop, useChangeCount } from "./motion";
 import { LiveTimer, PhasePill, PhaseTag, Spinner, StatusGlyph, activePhases, hueColor, loudPhases, phaseOf, phases, tint, tintAlpha, type Hue, type Phase } from "./status";
@@ -63,9 +65,11 @@ function rowReason(agent: AgentRecord, phase: Phase, now: number): ReasonLine | 
 }
 
 /** Memoized: a clock tick re-renders only rows whose time label or signal changed; running timers tick on their own. */
-export const SessionRow = memo(function SessionRow({ item, theme, compact, selected, expanded, timeLabel, signal, stat, rate, heartbeats, recap, day, marked = false, onToggle, onSelect }: {
+export const SessionRow = memo(function SessionRow({ item, theme, compact, selected, expanded, timeLabel, signal, stat, childTokens, rate, heartbeats, recap, day, marked = false, onToggle, onSelect }: {
   item: Extract<SessionItem, { kind: "row" }>; theme: PluginTheme; compact: boolean; selected: boolean; expanded: boolean; timeLabel: string; signal?: string;
-  /** An extra one-line summary under the row (the remote screen's per-row digest); nothing is drawn without one. */ stat?: string;
+  /** The remote screen's per-row metric strip; nothing is drawn without one. */ stat?: RowStats;
+  /** Tokens reported across this row's descendants, shown on the 子 Agent toggle so a thread can be judged collapsed. */
+  childTokens?: number;
   /** Output tokens per second of a running agent (from the local provider logs), when it is writing. */
   rate?: number;
   /** Heartbeats that wake this Agent (opus-B8). */
@@ -104,7 +108,8 @@ export const SessionRow = memo(function SessionRow({ item, theme, compact, selec
   return <View style={depth ? { marginLeft: 16 + (depth - 1) * 22, paddingLeft: 6, borderLeftWidth: hairline, borderLeftColor: colors.border } : undefined}>
     {/* The row and its chip share a box of their own, so the chip sits on the row's last line, never on the 子 Agent toggle. */}
     <View>
-      <Pressable accessibilityRole="button" accessibilityLabel={t("secondarySessionList.view", { value1: agent.title, value2: stateName(agent), value3: marked ? t("secondarySessionList.awaitingArchive") : "" })} accessibilityState={{ selected }} {...aria({ selected })} onPress={() => onSelect(agent.id)}
+      <Pressable accessibilityRole="button" accessibilityLabel={t("secondarySessionList.view", { value1: agent.title, value2: stateName(agent), value3: marked ? t("secondarySessionList.awaitingArchive") : "" })
+        + (stat ? `. ${statsSentence(stat)}` : "")} accessibilityState={{ selected }} {...aria({ selected })} onPress={() => onSelect(agent.id)}
         style={state => ({ flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 10, paddingLeft: space.md, paddingRight: space.md, borderRadius: radius.md, opacity: row.context ? 0.62 : 1,
           backgroundColor: selected && !marked ? colors.surface2 : state.pressed || (state as { hovered?: boolean }).hovered ? colors.surface1 : wash ?? "transparent" })}>
         <Flash count={changes} color={tint(color, tintAlpha(theme) + 0.1)} radius={radius.md} />
@@ -136,8 +141,8 @@ export const SessionRow = memo(function SessionRow({ item, theme, compact, selec
               <View style={{ flex: 1, minWidth: 0 }}><MetaLine theme={theme} parts={[...meta, row.node.cycleBroken ? t("secondarySessionList.aCycleInTheParentRelationship") : null]} /></View>
             </View>
           </View>
-          {/* Two lines: the remote summary is dense, and wrapping reads better than truncating the last counters away. */}
-          {stat ? <MetaLine theme={theme} parts={[stat]} numberOfLines={2} /> : null}
+          {/* Wrapping, not truncating: the chips at the end — checks, tokens, errors — are the ones a review came for. */}
+          {stat ? <RowStatStrip theme={theme} stats={stat} /> : null}
           {reason ? <View style={{ flexDirection: "row", alignItems: "center", gap: 4, minWidth: 0, paddingRight: reserve }}>
             <Icon name={reason.icon} size={12} color={hueColor(theme, reason.hue)} />
             <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: hueColor(theme, reason.hue, "text"), fontSize: fontSize.meta, lineHeight: 17, fontWeight: "600" }}>{reason.text}</Text>
@@ -155,6 +160,9 @@ export const SessionRow = memo(function SessionRow({ item, theme, compact, selec
       {childAttention > 0 && childPhase ? <ChildAttention theme={theme} count={childAttention} phase={childPhase} /> : null}
       {childRunning > 0 ? <><Text style={{ color: colors.foregroundMuted, fontSize: fontSize.meta }}>·</Text><Spinner size={10} color={hueColor(theme, "run")} /><Text style={{ color: hueColor(theme, "run", "text"), fontSize: fontSize.meta }}>{t("secondarySessionList.running2", { value1: childRunning })}</Text></> : null}
       {childUnread > 0 ? <Text style={{ color: hueColor(theme, "pink", "text"), fontSize: fontSize.meta, fontWeight: "600" }}>{t("secondarySessionList.unread", { value1: childUnread })}</Text> : null}
+      {/* What the thread cost, from the subagents' own reported usage: a collapsed thread is judged without opening it. */}
+      {childTokens ? <><Text style={{ color: colors.foregroundMuted, fontSize: fontSize.meta }}>·</Text>
+        <Text style={{ color: hueColor(theme, "cyan", "text"), fontSize: fontSize.meta, fontVariant: ["tabular-nums"] }}>{t("coreRemoteStats.childTokens", { value1: compactNumber(childTokens) })}</Text></> : null}
     </Pressable> : null}
   </View>;
 });
@@ -223,10 +231,12 @@ function GroupHeader({ theme, group, title, count }: { theme: PluginTheme; group
   </View>;
 }
 
-export function SessionList({ items, theme, compact, selectedId, expanded, forceExpanded = false, now, signals, stats, rates, heartbeats, recaps, recapsRevision = "", marked, empty, listRef, onScrollEnd, onToggle, onSelect }: {
+export function SessionList({ items, theme, compact, selectedId, expanded, forceExpanded = false, now, signals, stats, childTokens, rates, heartbeats, recaps, recapsRevision = "", marked, empty, listRef, onScrollEnd, onToggle, onSelect }: {
   items: readonly SessionItem[]; theme: PluginTheme; compact: boolean; selectedId: string | null; expanded: ReadonlySet<string>; forceExpanded?: boolean; now: number; signals: ReadonlyMap<string, string>;
-  /** An extra per-row summary line by Agent id (the remote screen's digests); absent on the dashboard, which draws none. */
-  stats?: ReadonlyMap<string, string>;
+  /** An extra per-row metric strip by Agent id (the remote screen's digests); absent on the dashboard, which draws none. */
+  stats?: ReadonlyMap<string, RowStats>;
+  /** Descendant token totals by Agent id, for the 子 Agent toggle line. */
+  childTokens?: ReadonlyMap<string, number>;
   rates?: ReadonlyMap<string, number>;
   heartbeats?: ReadonlyMap<string, HeartbeatSummary[]>;
   /** 每轮小结 by Agent (absent while they are off), and their revision, so rows draw again when one changes. */
@@ -238,7 +248,7 @@ export function SessionList({ items, theme, compact, selectedId, expanded, force
 }) {
   // Rows re-render only when a shown rate changes (rounded to 0.1 tok/s).
   // Rows redraw when a summary arrives; undefined (the dashboard) keeps the key constant, so nothing changes there.
-  const statsKey = useMemo(() => [...(stats ?? [])].map(([id, value]) => `${id}:${value}`).join(","), [stats]);
+  const statsKey = useMemo(() => [...(stats ?? [])].map(([id, value]) => `${id}:${value.signature}`).join(","), [stats]);
   const ratesKey = useMemo(() => [...(rates ?? [])].map(([id, rate]) => `${id}:${rate.toFixed(1)}`).join(","), [rates]);
   const scrollEnd = onScrollEnd ? (event: NativeSyntheticEvent<NativeScrollEvent>) => onScrollEnd(event.nativeEvent.contentOffset.y) : undefined;
   return <FlatList ref={listRef} data={items as SessionItem[]} keyExtractor={item => item.key} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={{ paddingHorizontal: space.xs, paddingBottom: space.xl }}
@@ -249,7 +259,7 @@ export function SessionList({ items, theme, compact, selectedId, expanded, force
       if (item.kind === "section") return <GroupHeader theme={theme} group={item.group} title={item.title} count={item.count} />;
       const id = item.row.node.agent.id, beats = heartbeats?.get(id);
       return <SessionRow item={item} theme={theme} compact={compact} selected={id === selectedId} expanded={forceExpanded || expanded.has(id)} timeLabel={agentTimeLabel(item.row.node.agent, now)}
-        signal={signals.get(id)} stat={stats?.get(id)} rate={rates?.get(id)} heartbeats={beats} recap={recaps?.get(id) ?? null} day={item.row.node.agent.stop ? now : dayOf(now)} marked={marked?.has(id) ?? false} onToggle={onToggle} onSelect={onSelect} />;
+        signal={signals.get(id)} stat={stats?.get(id)} childTokens={childTokens?.get(id)} rate={rates?.get(id)} heartbeats={beats} recap={recaps?.get(id) ?? null} day={item.row.node.agent.stop ? now : dayOf(now)} marked={marked?.has(id) ?? false} onToggle={onToggle} onSelect={onSelect} />;
     }} />;
 }
 /** Midnight of the device's day: rows without a live clock re-render once a day for 明天 / 今天. */

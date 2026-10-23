@@ -14,7 +14,8 @@ English and Simplified Chinese are built in, chosen by the device language, with
 
 Everything comes from the remote host's own connection, as the app already has it.
 
-- Sessions: the live agent directory, grouped and sorted like the local dashboard, with search, scope filters for what needs attention, running, unread and awaiting reply, and a per row summary of runtime, turns, thinking, tool calls, skills, subagents, changes, checks, tokens and errors.
+- Sessions: the live agent directory, grouped and sorted like the local dashboard, with search and scope filters for what needs attention, running, unread and awaiting reply.
+- Row metrics: each row carries a strip of labelled, coloured chips — run time, turns, failed turns, tool calls, failed tool calls with their rate, checks, changes with line counts, thinking, skills, subagents, approvals with the time you kept it waiting, context compactions, tokens and errors. A metric that carries nothing is left out, so a clean session stays short. Failed turns, a tool failure rate over 20 %, checks that mostly failed, and errors are filled rather than tinted, so a session worth opening is visible without reading the numbers. The same strip is drawn for subagent rows, and a collapsed thread shows what its subagents cost in tokens.
 - Events: the host's lifecycle stream, reconstructed from the attention and permission events it publishes.
 - Tokens: each loaded agent's reported usage, summed per agent and in total.
 - Signals: quiet, unread, waiting and repeated failure hints, computed from the directory and the observed events.

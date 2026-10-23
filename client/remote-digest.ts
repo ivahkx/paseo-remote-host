@@ -8,26 +8,10 @@ import { buildDigest } from "../shared/digest-build/build";
 import { readRemoteHistory } from "./remote-history-cache";
 import type { AgentRecord } from "../shared/model";
 import type { TelemetryEvent } from "../shared/telemetry";
-import { emptyTokenCounts } from "../shared/tokens";
 
-/**
- * The digest's token block from the agent's own reported usage (AgentUsage over the wire), when the provider reports any.
- * `cachedInputTokens` is the cached part of `inputTokens` — the same reading the plugin's own `totalTokens` (input + output)
- * assumes — so fresh input is the difference and `tokenInput`/`tokenTotal` still add up to what the header shows.
- * `calls`, `reasoning` and the per-call timing genuinely need the provider logs, so they stay zero and the Output rate tile
- * and per-call chart hide themselves rather than showing an invented number.
- */
-export function usageTokens(agent: AgentRecord): NonNullable<Digest["tokens"]> | null {
-  const { inputTokens, outputTokens, cachedInputTokens } = agent.usage;
-  if (inputTokens === null && outputTokens === null) return null;
-  const cacheRead = cachedInputTokens ?? 0, read = inputTokens ?? 0;
-  const totals = emptyTokenCounts();
-  totals.input = Math.max(0, read - cacheRead);
-  totals.cacheRead = Math.min(cacheRead, read);
-  totals.output = outputTokens ?? 0;
-  // `source` names a provider log this did not come from; it is not rendered anywhere in the digest.
-  return { source: "claude", totals, calls: [] };
-}
+/** The token synthesis the row strip and this tab share; re-exported from its pure home so callers keep one import. */
+export { usageTokens } from "../shared/row-stats";
+import { usageTokens } from "../shared/row-stats";
 
 export function useRemoteDigest(serverId: string, agent: AgentRecord, events: readonly TelemetryEvent[], enabled: boolean) {
   // Only the event kinds the activity builder reads, so an unrelated event does not re-run the whole fold.
