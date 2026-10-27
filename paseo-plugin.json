@@ -4,5 +4,11 @@
   "description": "Read-only view of the agents running on any host your app is connected to. It borrows that host's own connection, so it needs no endpoint, no credentials and nothing installed on the remote machine. Sessions, events, tokens, signals, and a per-session detail with result, recap, timeline, subtasks, diagnostics and an AI analysis that reads the remote session but runs its model on your own host. English and Simplified Chinese.",
   "requirements": {
     "paseo": ">=0.11.1"
+  },
+  "translations": {
+    "zh-CN": {
+      "name": "远程主机",
+      "description": "以只读方式查看你的 app 已连接的任意主机上正在运行的 Agent。它借用那台主机自己的连接，所以不需要地址、不需要凭据，远程机器上也不用安装任何东西。会话、事件、Token、信号，以及带结果、复盘、时间线、子任务、诊断和 AI 分析的单会话详情；分析读取远程会话，但模型运行在你自己的主机上。内置英文和简体中文。"
+    }
   }
 }

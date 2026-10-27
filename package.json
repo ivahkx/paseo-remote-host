@@ -1,7 +1,21 @@
 {
   "name": "remote-host",
-  "private": true,
   "version": "1.1.0",
+  "description": "Read-only view of agents on any host your Paseo app is connected to",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ivahkx/paseo-remote-host.git"
+  },
+  "files": [
+    "paseo-plugin.json",
+    "OVERVIEW.md",
+    "OVERVIEW.zh-CN.md",
+    "NOTICE",
+    "index.client.tsx",
+    "client/",
+    "shared/"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "tsx --import ./tests/i18n-setup.ts --test tests/*.test.ts"
@@ -18,7 +32,5 @@
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "zod": "^4.4.3"
-  },
-  "description": "Read-only view of agents on any host your Paseo app is connected to",
-  "license": "MIT"
+  }
 }
