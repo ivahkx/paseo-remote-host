@@ -55,6 +55,12 @@ export const DIRECTORY_LIMIT = 2_000;
 export const DIRECTORY_POLL_INTERVAL = 15_000;
 export const DIRECTORY_RECONCILE_INTERVAL = 10 * 60_000;
 const OBSERVE_RETRY_DELAYS = [2_000, 5_000, 15_000, 30_000, 60_000];
+/**
+ * How long a read waits for the observation handshake before going ahead without it. A local handshake settles in
+ * milliseconds; a borrowed remote connection whose subscription never answers must not hold the list empty, because the
+ * ordinary paged read is what fills it.
+ */
+const OBSERVE_HANDSHAKE_GRACE = 4_000;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : t("sharedDirectoryStore.m001");
@@ -204,8 +210,10 @@ export function createAgentDirectory(api: AgentDirectoryApi, options: DirectoryO
       observation = { handle, detach };
       retries = 0;
       publish({ live: true });
-      // A retry after a lost observation catches up on events missed meanwhile; startup reads are already queued.
-      if (!inFlight) void refresh();
+      // A retry after a lost observation catches up on events missed meanwhile. A read already running went ahead
+      // without this observation, so it was not journaled from its first page: follow it with one more.
+      if (inFlight) void inFlight.then(() => { if (!disposed && active && started) void refresh(); });
+      else void refresh();
     }).catch(() => {
       if (current !== observeGeneration) return;
       publish({ live: false });
@@ -213,6 +221,17 @@ export function createAgentDirectory(api: AgentDirectoryApi, options: DirectoryO
     }).finally(() => { if (current === observeGeneration) observing = null; });
     observing = request;
     return request;
+  }
+  /** Resolves when the observation handshake settles, or after the grace, so a stalled handshake cannot block a read. */
+  function settleObserve(): Promise<void> {
+    const pending = observing;
+    if (!pending) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => { if (done) return; done = true; clearTimeout(grace); resolve(); };
+      const grace = setTimeout(finish, OBSERVE_HANDSHAKE_GRACE);
+      void pending.then(finish, finish);
+    });
   }
   function observedAt(agent: AgentRecord): number | null {
     return timestamp(agent.updatedAt) ?? timestamp(agent.archivedAt);
@@ -277,7 +296,7 @@ export function createAgentDirectory(api: AgentDirectoryApi, options: DirectoryO
     publish({ isRefreshing: true });
     // Establish live delivery before reading pages, so changes during the read are journaled.
     // Deferring at least one microtask also journals synchronous SDK callbacks.
-    inFlight = Promise.resolve(observing ?? undefined).then(async () => {
+    inFlight = settleObserve().then(async () => {
       let truncated = false;
       let pages = 0;
       // Fetch attention first so old unread results are not hidden behind the

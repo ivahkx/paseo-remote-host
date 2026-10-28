@@ -74,17 +74,13 @@ function useRemoteDirectory(serverId: string | null, online: boolean): Observato
       return;
     }
     setState(LOADING_STATE);
-    let api;
-    try {
-      api = getPaseoClient(serverId);
-    } catch (error) {
-      setState({ ...IDLE_STATE, error: error instanceof Error ? error.message : String(error) });
-      return;
-    }
+    // Resolved per call, as every other borrowed read in this plugin is: the app replaces a host's connection on
+    // reconnect and then rejects calls on the previous one ("call getPaseoClient again"), so a client captured once
+    // would keep throwing for the rest of this screen's life instead of recovering with the host.
     const directory = createAgentDirectory(
       {
-        list: (options) => api.agents.list(options),
-        observe: (options) => api.agents.list({ ...options, subscribe: {} }).then((result) => result.subscription),
+        list: (options) => getPaseoClient(serverId).agents.list(options),
+        observe: (options) => getPaseoClient(serverId).agents.list({ ...options, subscribe: {} }).then((result) => result.subscription),
       },
       { includeArchived: false },
     );
